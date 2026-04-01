@@ -22,6 +22,12 @@ The app currently includes:
 - First-run privacy consent gate before gameplay
 - First-run onboarding overlay explaining gameplay and progression
 - Built-in telemetry event buffer with copyable diagnostics/session snapshots
+- Daily challenge rail with streak tracking and claimable revive-token rewards
+- Run summary overlay with combo, clears, and daily progress recap
+- Comfort settings:
+  - haptics
+  - reduced motion
+  - high contrast board rendering
 - Monetization sandbox hooks:
   - simulated premium unlock
   - simulated rewarded ad flow
