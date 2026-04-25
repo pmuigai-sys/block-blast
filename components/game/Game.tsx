@@ -3,10 +3,10 @@ import { DndProvider, DndProviderProps, Rectangle } from '@mgcrea/react-native-d
 import React, { useEffect, useState } from 'react';
 import { Platform, SafeAreaView, StyleSheet, View, Text } from 'react-native';
 import { GestureHandlerRootView, State } from 'react-native-gesture-handler';
-import Animated, { ReduceMotion, runOnJS, useSharedValue, FadeInUp, FadeOutUp } from 'react-native-reanimated';
+import Animated, { ReduceMotion, runOnJS, useSharedValue, FadeInUp, FadeOutUp, useAnimatedReaction } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
-import { BoardBlockType, GRID_BLOCK_SIZE, JS_emptyPossibleBoardSpots, PossibleBoardSpots, XYPoint, breakLines, clearHoverBlocks, createPossibleBoardSpots, emptyPossibleBoardSpots, newEmptyBoard, placePieceOntoBoard, updateHoveredBreaks, canPlaceAnyPiece } from '@/constants/Board';
+import { BoardBlockType, GRID_BLOCK_SIZE, JS_emptyPossibleBoardSpots, PossibleBoardSpots, XYPoint, breakLines, clearHoverBlocks, createPossibleBoardSpots, emptyPossibleBoardSpots, newEmptyBoard, placePieceOntoBoard, updateHoveredBreaks, canPlaceAnyPiece, deepCopyBoard } from '@/constants/Board';
 import { StatsGameHud, StickyGameHud } from '@/components/game/GameHud';
 import BlockGrid from '@/components/game/BlockGrid';
 import { createHandWorklet, createRandomHand } from '@/constants/Hand';
@@ -33,6 +33,10 @@ const SPRING_CONFIG_MISSED_DRAG = {
 
 function decodeDndId(id: string): XYPoint {
 	"worklet";
+    const parts = id.split(',');
+    if (parts.length === 2) {
+	    return {x: Number(parts[0]), y: Number(parts[1])}
+    }
 	return {x: Number(id[0]), y: Number(id[2])}
 }
 
@@ -67,13 +71,19 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
     const [encouragement, setEncouragement] = useState<string | null>(null);
 
     const playSound = async (type: 'place' | 'clear' | 'gameover') => {
-        let file;
-        if (type === 'place') file = require('../../assets/audio/sfx/place.wav');
-        else if (type === 'clear') file = require('../../assets/audio/sfx/clear.wav');
-        else if (type === 'gameover') file = require('../../assets/audio/sfx/game_over.wav');
-        
-        const { sound } = await Audio.Sound.createAsync(file);
-        await sound.playAsync();
+        try {
+            let file;
+            if (type === 'place') file = require('../../assets/audio/sfx/place.wav');
+            else if (type === 'clear') file = require('../../assets/audio/sfx/clear.wav');
+            else if (type === 'gameover') file = require('../../assets/audio/sfx/game_over.wav');
+            
+            if (file) {
+                const { sound } = await Audio.Sound.createAsync(file);
+                await sound.playAsync();
+            }
+        } catch (e) {
+            console.warn("Audio play error", e);
+        }
     };
 
     const showEncouragement = (lines: number) => {
@@ -84,24 +94,22 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
     };
 
 	useEffect(() => {
+        const initialBoard = newEmptyBoard(boardLength);
 		if (gameMode !== GameModeType.Puzzle) {
 			const template = getRandomTemplate(boardLength);
 			if (template) {
-				const newBoard = [...board.value];
-				applyTemplate(newBoard, template);
-				board.value = newBoard;
+				applyTemplate(initialBoard, template);
 			}
 		} else {
-			const newBoard = [...board.value];
 			for (let i = 0; i < 5; i++) {
 				const rx = Math.floor(Math.random() * boardLength);
 				const ry = Math.floor(Math.random() * boardLength);
-				newBoard[ry][rx].hasGem = true;
-				newBoard[ry][rx].blockType = BoardBlockType.FILLED;
+				initialBoard[ry][rx].hasGem = true;
+				initialBoard[ry][rx].blockType = BoardBlockType.FILLED;
 			}
-			board.value = newBoard;
 		}
-		hand.value = createHandWorklet(handSize, gameMode, board.value);
+        board.value = initialBoard;
+		hand.value = createHandWorklet(handSize, gameMode, initialBoard);
 
 		createHighScore({score: score.value, date: new Date().getTime(), type: gameMode}).then((id) => {
 			scoreStorageId.value = id;
@@ -120,7 +128,7 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 			if (Platform.OS != 'web') runPiecePlacedHaptic();
             runOnJS(playSound)('place');
 
-			const newBoard = clearHoverBlocks([...board.value]);
+			const newBoard = deepCopyBoard(clearHoverBlocks(board.value));
 			placePieceOntoBoard(newBoard, piece, dropX, dropY, BoardBlockType.FILLED)
 			const { lines: linesBroken, gems } = breakLines(newBoard);
 			
@@ -137,7 +145,10 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 						nextBoard[ry][rx].hasGem = true;
 						nextBoard[ry][rx].blockType = BoardBlockType.FILLED;
 					}
+                    // Resetting board for next level
 					board.value = nextBoard;
+                    hand.value = createHandWorklet(handSize, gameMode, nextBoard);
+                    return;
 				}
 			}
 
@@ -176,7 +187,7 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
                 runOnJS(playSound)('gameover');
             }
 		} else {
-			board.value = clearHoverBlocks([...board.value]);
+			board.value = deepCopyBoard(clearHoverBlocks(board.value));
 		}
 		draggingPiece.value = null;
 		possibleBoardDropSpots.value = emptyPossibleBoardSpots(boardLength);
@@ -199,14 +210,14 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 	const handleUpdate: DndProviderProps["onUpdate"] = (event, {activeId, activeLayout, droppableActiveId}) => {
 		"worklet";
 		if (!droppableActiveId) {
-			board.value = clearHoverBlocks([...board.value]);
+			board.value = deepCopyBoard(clearHoverBlocks(board.value));
 			return;
 		}
 		if (draggingPiece.value == null) return;
 		const dropIdStr = droppableActiveId.toString();
 		const {x: dropX, y: dropY} = decodeDndId(dropIdStr);
 		const piece: PieceData = hand.value[draggingPiece.value!]!;
-		const newBoard = clearHoverBlocks([...board.value]);
+		const newBoard = deepCopyBoard(clearHoverBlocks(board.value));
 		updateHoveredBreaks(newBoard, piece, dropX, dropY);
 		board.value = newBoard
 	}
@@ -237,15 +248,10 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 
 function GameOverOverlay({ gameOver, onRestart }: { gameOver: SharedValue<boolean>, onRestart: () => void }) {
     const [visible, setVisible] = useState(false);
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (gameOver.value) {
-                setVisible(true);
-                clearInterval(interval);
-            }
-        }, 500);
-        return () => clearInterval(interval);
-    }, []);
+    
+    useAnimatedReaction(() => gameOver.value, (cur) => {
+        if (cur) runOnJS(setVisible)(true);
+    });
 
     if (!visible) return null;
 

@@ -1,19 +1,14 @@
 import {
 	Board,
 	BoardBlockType,
-	forEachBoardBlock,
 	GRID_BLOCK_SIZE,
 	HITBOX_SIZE,
 	PossibleBoardSpots,
 } from "@/constants/Board";
 import { colorToHex } from "@/constants/Color";
 import { Hand } from "@/constants/Hand";
-import {
-	createEmptyBlockStyle,
-	createFilledBlockStyle,
-} from "@/constants/Piece";
 import { useDroppable } from "@mgcrea/react-native-dnd";
-import { useEffect } from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Animated, {
 	SharedValue,
@@ -21,10 +16,10 @@ import Animated, {
 	useAnimatedReaction,
 	useAnimatedStyle,
 	useSharedValue,
-	withDelay,
-	withSequence,
 	withTiming,
+    useDerivedValue,
 } from "react-native-reanimated";
+import BlockVisual from "./BlockVisual";
 
 interface BlockGridProps {
 	board: SharedValue<Board>;
@@ -34,27 +29,43 @@ interface BlockGridProps {
 }
 
 function BlockCell({ x, y, board, possibleBoardDropSpots }: { x: number, y: number, board: SharedValue<Board>, possibleBoardDropSpots: SharedValue<PossibleBoardSpots> }) {
-    const boardSize = board.value.length;
-    const loadBlockFlash = useSharedValue(0);
+    // We must use a local shared value for the "last valid color" during the fall animation
+    // because the board value will be EMPTY while the animation is still playing.
+    const lastColor = useSharedValue(board.value[y][x].color);
+    const lastHoverColor = useSharedValue(board.value[y][x].hoveredBreakColor);
+    
     const placedBlockFall = useSharedValue(0);
     const placedBlockDirectionX = useSharedValue(0);
     const placedBlockDirectionY = useSharedValue(0);
     const placedBlockRotation = useSharedValue(0);
 
+    // This state is only for gems/react-native text rendering which is slow anyway
+    const [hasGem, setHasGem] = useState(board.value[y][x].hasGem);
+
     useAnimatedReaction(() => {
-        return board.value[y][x].blockType
+        return board.value[y][x];
     }, (cur, prev) => {
-        if (cur == BoardBlockType.EMPTY && (prev == BoardBlockType.FILLED || prev == BoardBlockType.HOVERED_BREAK_EMPTY || prev == BoardBlockType.HOVERED_BREAK_FILLED)) {
+        if (cur.hasGem !== prev?.hasGem) {
+            runOnJS(setHasGem)(cur.hasGem);
+        }
+
+        if (cur.blockType !== BoardBlockType.EMPTY) {
+            lastColor.value = cur.color;
+            lastHoverColor.value = cur.hoveredBreakColor;
+        }
+        
+        // Handle clear animation
+        if (cur.blockType == BoardBlockType.EMPTY && prev && (prev.blockType == BoardBlockType.FILLED || prev.blockType == BoardBlockType.HOVERED_BREAK_EMPTY || prev.blockType == BoardBlockType.HOVERED_BREAK_FILLED)) {
             const angle = Math.random() * Math.PI * 2;
-            const distance = 200;
-            const rotation = (Math.random() - 0.5) * Math.PI * 2;
+            const distance = 250;
+            const rotation = (Math.random() - 0.5) * Math.PI * 4;
             
             placedBlockDirectionX.value = Math.cos(angle) * distance;
             placedBlockDirectionY.value = Math.sin(angle) * distance;
             placedBlockRotation.value = rotation;
             
             placedBlockFall.value = withTiming(1, { 
-                duration: 500 
+                duration: 600 
             }, (finished) => {
                 'worklet';
                 if (finished) {
@@ -64,84 +75,109 @@ function BlockCell({ x, y, board, possibleBoardDropSpots }: { x: number, y: numb
         }
     });
 
-    useEffect(() => {
-        if (board.value[y][x].blockType != BoardBlockType.EMPTY) 
-            return;
-        const step = 70;
-        const upwardDelay = (boardSize - 1 - y) * step;
-        const downwardDelay = 2 * y * step;
-        
-        loadBlockFlash.value = withDelay(
-            upwardDelay,
-            withSequence(
-                withTiming(1, { duration: step }),
-                withDelay(downwardDelay, withTiming(0, { duration: step }))
-            )
-		);
-    }, [board.value[y][x].blockType]);
-
     const animatedStyle = useAnimatedStyle(() => {
         const block = board.value[y][x];
         
         if (placedBlockFall.value > 0) {
             let progress = placedBlockFall.value;
-			progress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);// easeOutCirc
+			progress = progress === 1 ? 1 : 1 - Math.pow(2, -10 * progress);
             return {
-                ...createFilledBlockStyle(block.color),
                 opacity: 1 - progress,
+                zIndex: 10,
                 transform: [
-                    { scale: 1 - progress },
-                    { 
-                        translateX: placedBlockDirectionX.value * progress 
-                    },
-                    { 
-                        translateY: placedBlockDirectionY.value * progress 
-                    },
-                    { 
-                        rotate: `${placedBlockRotation.value * progress}rad` 
-                    }
+                    { scale: 1 - progress * 0.5 },
+                    { translateX: placedBlockDirectionX.value * progress },
+                    { translateY: placedBlockDirectionY.value * progress },
+                    { rotate: `${placedBlockRotation.value * progress}rad` }
                 ]
             }
         }
 
-        if (block.blockType == BoardBlockType.FILLED || block.blockType == BoardBlockType.HOVERED) {
-            return {
-                ...createFilledBlockStyle(block.color),
-                opacity: block.blockType == BoardBlockType.HOVERED ? 0.3 : 1,
-            };
-        } else if (block.blockType == BoardBlockType.HOVERED_BREAK_EMPTY || block.blockType == BoardBlockType.HOVERED_BREAK_FILLED) {
-            const blockColor =
-                block.blockType == BoardBlockType.HOVERED_BREAK_EMPTY
-                    ? block.color
-                    : block.hoveredBreakColor;
-            return {
-                ...createFilledBlockStyle(blockColor),
-            };
-        }
-
         return {
-            backgroundColor: 'rgba(255, 255, 255, 0.05)',
-            transform: []
+            opacity: block.blockType == BoardBlockType.HOVERED ? 0.4 : 1,
+            transform: [],
+            zIndex: block.blockType !== BoardBlockType.EMPTY ? 5 : 1,
         };
     });
 
-    const blockPositionStyle = {
-        position: "absolute",
-        top: y * GRID_BLOCK_SIZE,
-        left: x * GRID_BLOCK_SIZE,
-    };
-    
+    const visualProps = useDerivedValue(() => {
+        const block = board.value[y][x];
+        const isFilled = block.blockType !== BoardBlockType.EMPTY || placedBlockFall.value > 0;
+        
+        let color = block.color;
+        if (block.blockType === BoardBlockType.HOVERED_BREAK_FILLED) {
+            color = block.hoveredBreakColor;
+        } else if (placedBlockFall.value > 0) {
+            // Use cached color for falling blocks
+            color = lastColor.value;
+        }
+
+        return {
+            isFilled,
+            color
+        };
+    });
+
     return (
-        <Animated.View style={[styles.emptyBlock, blockPositionStyle as any, animatedStyle]}>
-            {board.value[y][x].hasGem && (
-                <Text style={{fontSize: 20, textAlign: 'center', lineHeight: GRID_BLOCK_SIZE}}>💎</Text>
+        <View style={[styles.cellContainer, { top: y * GRID_BLOCK_SIZE, left: x * GRID_BLOCK_SIZE }]}>
+            <AnimatedBlockWrapper visualProps={visualProps} animatedStyle={animatedStyle} />
+            
+            {hasGem && (
+                <View style={StyleSheet.absoluteFill}>
+                     <AnimatedGemWrapper board={board} x={x} y={y} />
+                </View>
             )}
+
             <BlockDroppable
                 x={x}
                 y={y}
                 style={styles.hitbox}
                 possibleBoardDropSpots={possibleBoardDropSpots}
             />
+        </View>
+    );
+}
+
+// Separate component for the animated block to ensure pure Reanimated rendering
+function AnimatedBlockWrapper({ visualProps, animatedStyle }: { visualProps: SharedValue<any>, animatedStyle: any }) {
+    const internalStyle = useAnimatedStyle(() => {
+        if (!visualProps.value.isFilled) {
+            return { display: 'none' };
+        }
+        return { display: 'flex' };
+    });
+
+    return (
+        <Animated.View style={[animatedStyle, internalStyle]}>
+            <BlockVisualReanimated visualProps={visualProps} />
+        </Animated.View>
+    );
+}
+
+// Truly reactive BlockVisual that doesn't rely on JS state
+function BlockVisualReanimated({ visualProps }: { visualProps: SharedValue<any> }) {
+    const [color, setColor] = useState(visualProps.value.color);
+
+    useAnimatedReaction(() => visualProps.value.color, (c) => {
+        runOnJS(setColor)(c);
+    });
+
+    return <BlockVisual color={color} size={GRID_BLOCK_SIZE} />;
+}
+
+function AnimatedGemWrapper({ board, x, y }: { board: SharedValue<Board>, x: number, y: number }) {
+    const gemStyle = useAnimatedStyle(() => {
+        const block = board.value[y][x];
+        const isFilled = block.blockType === BoardBlockType.FILLED;
+        return {
+            opacity: isFilled ? 0 : 1,
+            display: isFilled ? 'none' : 'flex'
+        };
+    });
+
+    return (
+        <Animated.View style={[StyleSheet.absoluteFill, styles.gemContainer, gemStyle]}>
+            <Text style={styles.gemText}>💎</Text>
         </Animated.View>
     );
 }
@@ -152,29 +188,44 @@ export default function BlockGrid({
 	draggingPiece,
 	hand
 }: BlockGridProps) {
-	const blockElements: any[] = [];
-	forEachBoardBlock(board.value, (_block, x, y) => {
-		blockElements.push(
-			<BlockCell
-				key={`av${x},${y}`}
-                x={x}
-                y={y}
-                board={board}
-                possibleBoardDropSpots={possibleBoardDropSpots}
-			/>
-		);
-	});
+	const boardLength = board.value.length;
+    
+    const gridLines = [];
+    for (let y = 0; y < boardLength; y++) {
+        for (let x = 0; x < boardLength; x++) {
+            gridLines.push(
+                <View key={`g${x},${y}`} style={[styles.gridLine, { 
+                    top: y * GRID_BLOCK_SIZE, 
+                    left: x * GRID_BLOCK_SIZE,
+                    width: GRID_BLOCK_SIZE,
+                    height: GRID_BLOCK_SIZE
+                }]} />
+            );
+        }
+    }
+
+    const blockCells = [];
+    for (let y = 0; y < boardLength; y++) {
+        for (let x = 0; x < boardLength; x++) {
+            blockCells.push(
+                <BlockCell
+                    key={`c${x},${y}`}
+                    x={x}
+                    y={y}
+                    board={board}
+                    possibleBoardDropSpots={possibleBoardDropSpots}
+                />
+            );
+        }
+    }
 	
 	const gridStyle = useAnimatedStyle(() => {
 		let style: any;
 		if (draggingPiece.value == null) {
-			style = {
-				borderColor: 'white'
-			}
+			style = { borderColor: 'white' }
 		} else {
-			style = {
-				borderColor: colorToHex(hand.value[draggingPiece.value!]!.color)
-			}
+            const piece = hand.value[draggingPiece.value!];
+			style = { borderColor: piece ? colorToHex(piece.color) : 'white' }
 		}
 		return style;
 	});
@@ -184,13 +235,14 @@ export default function BlockGrid({
 			style={[
 				styles.grid,
 				{
-					width: GRID_BLOCK_SIZE * board.value.length + 6,
-					height: GRID_BLOCK_SIZE * board.value.length + 6,
+					width: GRID_BLOCK_SIZE * boardLength + 6,
+					height: GRID_BLOCK_SIZE * boardLength + 6,
 				},
 				gridStyle
 			]}
 		>
-			{blockElements}
+            <View style={StyleSheet.absoluteFill}>{gridLines}</View>
+			{blockCells}
 		</Animated.View>
 	);
 }
@@ -212,31 +264,20 @@ function BlockDroppable({
 	...otherProps
 }: BlockDroppableProps) {
 	const id = `${x},${y}`;
-	const { props, activeId } = useDroppable({
-		id,
-	});
+	const { props } = useDroppable({ id });
 
 	const updateLayout = () => {
-		setTimeout(() => {
-			(props.onLayout as any)(null);
-		}, 1000 / 60);
+		setTimeout(() => { (props.onLayout as any)(null); }, 1000 / 60);
 	};
 
 	const animatedStyle = useAnimatedStyle(() => {
 		runOnJS(updateLayout)();
 		const active = possibleBoardDropSpots.value[y][x] == 1;
-		if (active) {
-			return {
-				width: HITBOX_SIZE,
-				height: HITBOX_SIZE,
-			};
-		} else {
-			return {
-				width: 0,
-				height: 0,
-			};
-		}
-	}, [props, possibleBoardDropSpots]);
+		return {
+			width: active ? HITBOX_SIZE : 0,
+			height: active ? HITBOX_SIZE : 0,
+		};
+	});
 
 	return (
 		<Animated.View {...props} style={[style, animatedStyle]} {...otherProps}>
@@ -246,27 +287,37 @@ function BlockDroppable({
 }
 
 const styles = StyleSheet.create({
-	emptyBlock: {
+	cellContainer: {
 		width: GRID_BLOCK_SIZE,
 		height: GRID_BLOCK_SIZE,
-		margin: 0,
-		borderWidth: 1,
-		borderColor: 'rgba(255, 255, 255, 0.2)', // Stable grid line color
-		borderRadius: 0,
 		position: "absolute",
 		justifyContent: "center",
 		alignItems: "center",
 	},
+    gridLine: {
+        position: 'absolute',
+        borderWidth: 0.5,
+        borderColor: 'rgba(255, 255, 255, 0.15)',
+    },
 	grid: {
 		position: "relative",
 		backgroundColor: "rgb(0, 0, 0, 1)",
 		borderWidth: 3,
 		borderRadius: 5,
 		borderColor: "rgb(255, 255, 255)",
-		opacity: 1,
 	},
 	hitbox: {
 		width: HITBOX_SIZE,
 		height: HITBOX_SIZE,
+        position: 'absolute',
 	},
+    gemContainer: {
+        justifyContent: 'center',
+        alignItems: 'center'
+    },
+    gemText: {
+        fontSize: 20, 
+        textAlign: 'center', 
+        lineHeight: GRID_BLOCK_SIZE
+    }
 });

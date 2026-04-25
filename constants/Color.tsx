@@ -57,7 +57,7 @@ export function colorToHex(color: Color | null): string {
     }
 
     const toHex = (value: number) => {
-        const clamped = Math.max(0, Math.min(255, value));
+        const clamped = Math.max(0, Math.min(255, Math.round(value)));
         return clamped.toString(16).padStart(2, '0');
     };
 

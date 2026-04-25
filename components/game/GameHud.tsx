@@ -113,17 +113,19 @@ export function StickyGameHud({gameMode, score}: {gameMode: GameModeType, score:
 	const [ scoreState, setScoreState ] = useState(score.value);
 
 	useEffect(() => {
-		getHighScores(gameMode, true, true).then((highScores) => {
-			if (highScores.length == 0)
+		getHighScores(gameMode, true, true, 1).then((highScores) => {
+			if (highScores.length == 0) {
+				setHighestScore(0);
 				return;
+			}
 			setHighestScore(highScores[0].score);
 		});
-	}, [setHighestScore]);
+	}, [gameMode, setHighestScore]);
 	
 	useAnimatedReaction(() => {
 		return score.value;
 	}, (cur, prev) => {
-		runOnJS(setScoreState)(score.value);
+		runOnJS(setScoreState)(cur);
 	});
 
 	return <>

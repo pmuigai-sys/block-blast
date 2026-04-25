@@ -102,6 +102,11 @@ export function createPossibleBoardSpots(
   return fitPositions;
 }
 
+export function deepCopyBoard(board: Board): Board {
+  "worklet";
+  return board.map(row => row.map(cell => ({...cell})));
+}
+
 export function clearHoverBlocks(board: Board): Board {
   "worklet";
   const boardLength = board.length;

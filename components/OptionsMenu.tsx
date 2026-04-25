@@ -9,7 +9,7 @@ export default function OptionsMenu() {
 
 	return <SimplePopupView>
 		<StylizedButton onClick={popAppState} text="Back" backgroundColor={cssColors.spaceGray}></StylizedButton>
-		{ appState.containsGameMode() && 
+		{ appState.history.length > 1 && 
 			<StylizedButton onClick={() => { setAppState(MenuStateType.MENU) }} text="Quit Run" backgroundColor={cssColors.brightNiceRed}></StylizedButton>
 		}
 	</SimplePopupView>
