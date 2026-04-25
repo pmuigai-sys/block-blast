@@ -215,13 +215,6 @@ export const piecesData: PieceDataSaved[] = [
 		],
 		distributionPoints: 2,
 	},
-	// 1x1 (Survival Block)
-	{
-		matrix: [
-			[1],
-		],
-		distributionPoints: 0.5,
-	}
 ];
 
 export const pieceColors = [

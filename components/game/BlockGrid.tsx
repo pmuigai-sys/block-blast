@@ -160,6 +160,7 @@ function BlockVisualReanimated({ visualProps }: { visualProps: SharedValue<any> 
 
 function AnimatedGemWrapper({ board, x, y }: { board: SharedValue<Board>, x: number, y: number }) {
     const gemStyle = useAnimatedStyle(() => {
+        const block = board.value[y][x];
         return {
             opacity: 1,
             display: 'flex',

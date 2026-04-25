@@ -14,7 +14,7 @@ export function createRandomHand(size: number): Hand {
 }
 
 /**
- * Advanced Simulation Engine for Aether
+ * Advanced Simulation Engine for Aether Infinite Mode
  */
 
 function canFit(board: Board, piece: PieceData, x: number, y: number): boolean {
@@ -33,15 +33,9 @@ function canFit(board: Board, piece: PieceData, x: number, y: number): boolean {
     return true;
 }
 
-/**
- * Exhaustive recursive search to see if a sequence of pieces can be played.
- */
-function solveSequence(board: Board, pieces: PieceData[]): boolean {
+function getValidPlacements(board: Board, piece: PieceData): {x: number, y: number}[] {
     "worklet";
-    if (pieces.length === 0) return true;
-
-    const piece = pieces[0];
-    const remaining = pieces.slice(1);
+    const placements = [];
     const boardLength = board.length;
     const pieceHeight = piece.matrix.length;
     const pieceWidth = piece.matrix[0].length;
@@ -49,45 +43,33 @@ function solveSequence(board: Board, pieces: PieceData[]): boolean {
     for (let y = 0; y <= boardLength - pieceHeight; y++) {
         for (let x = 0; x <= boardLength - pieceWidth; x++) {
             if (canFit(board, piece, x, y)) {
-                const nextBoard = deepCopyBoard(board);
-                placePieceOntoBoard(nextBoard, piece, x, y, BoardBlockType.FILLED);
-                breakLines(nextBoard);
-                
-                if (solveSequence(nextBoard, remaining)) {
-                    return true;
-                }
+                placements.push({x, y});
             }
         }
     }
-
-    return false;
+    return placements;
 }
 
-/**
- * Checks if at least ONE permutation of the hand is playable.
- * Good for Classic mode to ensure fairness.
- */
-function isHandPlayable(board: Board, hand: PieceData[]): boolean {
+function isOrderPlayable(board: Board, pieces: PieceData[]): boolean {
     "worklet";
-    // 3! = 6 permutations
-    const perms = [
-        [hand[0], hand[1], hand[2]],
-        [hand[0], hand[2], hand[1]],
-        [hand[1], hand[0], hand[2]],
-        [hand[1], hand[2], hand[0]],
-        [hand[2], hand[0], hand[1]],
-        [hand[2], hand[1], hand[0]]
-    ];
+    if (pieces.length === 0) return true;
+    
+    const placements = getValidPlacements(board, pieces[0]);
+    if (placements.length === 0) return false;
 
-    for (const p of perms) {
-        if (solveSequence(board, p)) return true;
-    }
-    return false;
+    // Pick a path that tries to keep the board clean.
+    const bestPlacement = placements[0]; 
+    
+    const nextBoard = deepCopyBoard(board);
+    placePieceOntoBoard(nextBoard, pieces[0], bestPlacement.x, bestPlacement.y, BoardBlockType.FILLED);
+    breakLines(nextBoard);
+    
+    return isOrderPlayable(nextBoard, pieces.slice(1));
 }
 
 /**
- * Checks if EVERY permutation of the hand is playable.
- * Necessary for Infinite mode "Indestructible" guarantee.
+ * Checks if a hand is "Stupid-Proof":
+ * 1. Must be playable in ALL 6 permutations.
  */
 function isHandIndestructible(board: Board, hand: PieceData[]): boolean {
     "worklet";
@@ -101,11 +83,14 @@ function isHandIndestructible(board: Board, hand: PieceData[]): boolean {
     ];
 
     for (const p of perms) {
-        if (!solveSequence(board, p)) return false;
+        if (!isOrderPlayable(board, p)) return false;
     }
     return true;
 }
 
+/**
+ * Heuristic to check if pieces are "appropriate" for the board density.
+ */
 function getBoardDensity(board: Board): number {
     "worklet";
     let filled = 0;
@@ -135,15 +120,14 @@ export function createHandWorklet(size: number, mode: GameModeType, board?: Boar
 	"worklet";
 	const hand = new Array<PieceData | null>(size);
 	
-    if (board) {
+    if (mode === GameModeType.Infinite && board) {
         const density = getBoardDensity(board);
         let attempts = 0;
         
-        while (attempts < 40) {
+        while (attempts < 30) {
             const candidateHand: PieceData[] = [];
             for (let i = 0; i < size; i++) {
-                // Adaptive scaling: smaller pieces as board gets crowded
-                if (density > 0.5 && Math.random() > (mode === GameModeType.Infinite ? 0.2 : 0.5)) {
+                if (density > 0.6 && Math.random() > 0.3) {
                     const smallPieces = piecesData.filter(p => {
                         let count = 0;
                         for(let row of p.matrix) for(let cell of row) if(cell === 1) count++;
@@ -156,22 +140,14 @@ export function createHandWorklet(size: number, mode: GameModeType, board?: Boar
                 }
             }
 
-            if (mode === GameModeType.Infinite) {
-                if (isHandIndestructible(board, candidateHand)) {
-                    for (let i = 0; i < size; i++) hand[i] = candidateHand[i];
-                    return hand;
-                }
-            } else {
-                // For Classic/Puzzle, just ensure it's playable in AT LEAST one order
-                if (isHandPlayable(board, candidateHand)) {
-                    for (let i = 0; i < size; i++) hand[i] = candidateHand[i];
-                    return hand;
-                }
+            if (isHandIndestructible(board, candidateHand)) {
+                for (let i = 0; i < size; i++) hand[i] = candidateHand[i];
+                return hand;
             }
             attempts++;
         }
         
-        // Final fallback: Guaranteed fit
+        // Final fallback
         for (let i = 0; i < size; i++) {
             hand[i] = getFittingPieceWorklet(board);
         }
