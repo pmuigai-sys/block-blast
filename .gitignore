@@ -1,24 +1,41 @@
-.vscode/
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
 .DS_Store
-Thumbs.db
-build/
-.dart_tool/
-*.iml
-*.log
-copilot_instructions_ultra.md
-GENERAL_AUTOPILOT_INSTRUCTIONS_ULTRA_V2.md
-block_blast_app/.dart_tool/
-block_blast_app/build/
-block_blast_app/.flutter-plugins-dependencies
-block_blast_app/.idea/
-block_blast_app/*.iml
-block_blast_app/android/local.properties
-**/.idea/
-build/
-.dart_tool/
-**/.dart_tool/
-**/build/
-**/.flutter-plugins-dependencies
-Thumbs.db
-.DS_Store
-temp_probe_app/
+*.pem
+
+# local env files
+.env*.local
+
+# typescript
+*.tsbuildinfo
+
+app-example
+
+*.swp
+*.swo
