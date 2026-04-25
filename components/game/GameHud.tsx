@@ -1,13 +1,53 @@
 import { useEffect, useState } from "react"
 import { Pressable, StyleSheet, Text, View } from "react-native"
-import Animated, { SharedValue, interpolateColor, runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from "react-native-reanimated"
-import { Hand } from "@/constants/Hand";
-import { GameModeType, MenuStateType, useAppState } from "@/hooks/useAppState";
-import { getHighScores } from "@/constants/Storage";
-import { Color, colorLerp, colorToHex } from "@/constants/Color";
+import Animated, { SharedValue, interpolateColor, runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withDelay, withSequence, withTiming } from "react-native-reanimated"
+import { cssColors } from "@/constants/Color"
+import { Hand } from "@/constants/Hand"
+import { GameModeType, MenuStateType, useAppState, useSetAppState } from "@/hooks/useAppState"
+import { getHighScores } from "@/constants/Storage"
 
-const comboBarGoodColor = colorToHex({r: 0, g: 255, b: 0});
-const comboBarBadColor = colorToHex({r: 255, g: 51, b: 51});
+interface ComboBarProps {
+	lastBrokenLine: SharedValue<number>,
+	handSize: number
+}
+
+function ComboBar({ lastBrokenLine, handSize }: ComboBarProps) {
+	const totalBlocks = 10;
+	const blockElements = [];
+
+	for (let i = 0; i < totalBlocks; i++) {
+		blockElements.push(<ComboBlock key={i} index={i} lastBrokenLine={lastBrokenLine} handSize={handSize}></ComboBlock>)
+	}
+
+	return <View style={styles.comboBarContainer}>
+		{blockElements}
+	</View>
+}
+
+function ComboBlock({ index, lastBrokenLine, handSize }: { index: number, lastBrokenLine: SharedValue<number>, handSize: number }) {
+	const blockOpacity = useSharedValue(0);
+
+	useAnimatedReaction(() => {
+		return lastBrokenLine.value;
+	}, (current, _prev) => {
+		const targetOpacity = current == 0 ? 1 : 1 - (current / handSize);
+		const baseIndex = index / 10;
+		if (baseIndex < targetOpacity) {
+			blockOpacity.value = withDelay(index * 20, withTiming(1, { duration: 100 }));
+		} else {
+			blockOpacity.value = withTiming(0, { duration: 100 });
+		}
+	})
+
+	const animatedStyle = useAnimatedStyle(() => {
+		return {
+			opacity: blockOpacity.value,
+			backgroundColor: interpolateColor(blockOpacity.value, [0, 1], ["rgba(255, 255, 255, 0.1)", "rgba(0, 255, 0, 1)"])
+		}
+	})
+
+	return <Animated.View style={[styles.comboBlock, animatedStyle]}></Animated.View>
+}
 
 interface GameHudProps {
 	score: SharedValue<number>,
@@ -24,7 +64,7 @@ export function StatsGameHud({ score, combo, lastBrokenLine, hand, level, gems, 
 	const [scoreText, setScoreText] = useState("0");
 	const [levelText, setLevelText] = useState("1");
 	const [gemsText, setGemsText] = useState("0/5");
-	const scoreAnimValue = useSharedValue(0); // stores the score, used to interpolate the number for animation
+	const scoreAnimValue = useSharedValue(0);
 
 	useAnimatedReaction(() => {
 		return score.value;
@@ -70,44 +110,6 @@ export function StatsGameHud({ score, combo, lastBrokenLine, hand, level, gems, 
 	</>
 }
 
-interface ComboBarProps {
-	lastBrokenLine: SharedValue<number>,
-	handSize: number
-};
-
-function ComboBar({ lastBrokenLine, handSize }: ComboBarProps) {
-	const fillPercentage = useSharedValue(100);
-	
-	useAnimatedReaction(() => {
-		return lastBrokenLine.value
-	}, (_cur, _prev) => {
-		'worklet';
-		fillPercentage.value = withSpring((1 - lastBrokenLine.value / handSize) * 100, {
-			duration: 800,
-			overshootClamping: true
-		})
-	})
-	const animatedStyle = useAnimatedStyle(() => {
-		return {
-			width: `${fillPercentage.value}%`,
-			backgroundColor: interpolateColor(fillPercentage.value / 100, [0, 1/5, 1], ['transparent', comboBarBadColor, comboBarGoodColor]),
-			transform: [
-				{
-					scale: lastBrokenLine.value == handSize - 1 ? withRepeat(
-						withDelay(500, withRepeat(withSequence(withTiming(1.1), withTiming(1)), 2))
-					, 1000) : 1
-				}
-			]
-		};
-	}, [fillPercentage]);
-
-	return (
-		<View style={styles.comboBarParent}>
-			<Animated.View style={[styles.comboBar, animatedStyle]} />
-		</View>
-	);
-};
-
 export function StickyGameHud({gameMode, score}: {gameMode: GameModeType, score: SharedValue<number>}) {
 	const [ highestScore, setHighestScore ] = useState(0);
 	const [ scoreState, setScoreState ] = useState(score.value);
@@ -128,85 +130,77 @@ export function StickyGameHud({gameMode, score}: {gameMode: GameModeType, score:
 		runOnJS(setScoreState)(cur);
 	});
 
-	return <>
-		<Text style={styles.highScoreLabel}>{"👑" + Math.max(scoreState, highestScore)}</Text>
+	return <View style={styles.stickyHudWrapper}>
+		<View style={styles.highScoreContainer}>
+			<Text style={styles.highScoreLabel}>{"👑" + Math.max(scoreState, highestScore)}</Text>
+		</View>
 		<SettingsButton></SettingsButton>
-	</>
+	</View>
 }
 
 function SettingsButton() {
-	const [_appState, _setAppState, appendAppState ] = useAppState();
-
-	return <Pressable onPress={() => {appendAppState(MenuStateType.OPTIONS)}} style={styles.settingsButton}>
-		<Text style={styles.settingsEmoji}>
-			{"⚙️"}
-		</Text>
+	const [ _, appendAppState ] = useSetAppState();
+	return <Pressable style={styles.settingsButton} onPress={() => {
+		appendAppState(MenuStateType.OPTIONS);
+	}}>
+		<Text style={{ fontSize: 30 }}>⚙️</Text>
 	</Pressable>
 }
 
 const styles = StyleSheet.create({
+	hudContainer: {
+		width: '100%',
+		paddingHorizontal: 20,
+		paddingTop: 80,
+		alignItems: 'center',
+		justifyContent: 'center',
+		zIndex: 10,
+	},
+	scoreContainer: {
+		marginBottom: 10,
+	},
+	comboBarContainer: {
+		flexDirection: 'row',
+		width: '80%',
+		height: 10,
+		backgroundColor: 'rgba(255,255,255,0.1)',
+		borderRadius: 5,
+		overflow: 'hidden',
+	},
+	comboBlock: {
+		flex: 1,
+		height: '100%',
+		marginHorizontal: 1,
+	},
+	stickyHudWrapper: {
+		position: 'absolute',
+		top: 10,
+		left: 0,
+		right: 0,
+		height: 60,
+		flexDirection: 'row',
+		justifyContent: 'space-between',
+		alignItems: 'center',
+		paddingHorizontal: 20,
+		zIndex: 1000,
+	},
+	highScoreContainer: {
+		backgroundColor: 'rgba(0,0,0,0.5)',
+		paddingHorizontal: 15,
+		paddingVertical: 8,
+		borderRadius: 20,
+		borderWidth: 1,
+		borderColor: 'rgba(255,255,255,0.2)',
+	},
+	highScoreLabel: {
+		color: 'white',
+		fontFamily: 'Silkscreen',
+		fontSize: 18,
+	},
 	settingsButton: {
 		width: 50,
 		height: 50,
-		borderRadius: 18,
-		backgroundColor: 'rgba(20, 20, 20, 0.8)',
-		justifyContent: 'center',
-		alignItems: 'center',
-		position: 'absolute',
-		alignSelf: 'flex-end',
-		zIndex: 1000,
-		top: 50,
-		right: 50
-	},
-	settingsEmoji: {
-		color: 'white',
-		fontSize: 30
-	},
-	highScoreLabel: {
-		color: 'rgb(240, 175, 12)',
-		fontFamily: 'Silkscreen',
-		fontSize: 35,
-		fontWeight: '100',
-		position: 'absolute',
-		top: 50,
-		left: 50
-	},
-	hudContainer: {
-		width: '100%',
-		height: 120,
 		justifyContent: 'center',
 		alignItems: 'center',
 	},
-	scoreContainer: {
-		width: '100%',
-		height: 54,
-		justifyContent: 'center',
-		alignItems: 'center',
-		marginTop: 14,
-		marginBottom: 14,
-	},
-	comboBarParent: {
-		width: '100%',
-		height: 16,
-		borderWidth: 2,
-		borderRadius: 10,
-		borderColor: 'gray',
-		zIndex: 100,
-	},
-	comboBar: {
-		height: 12,
-		borderRadius: 10,
-		backgroundColor: 'blue',
-		zIndex: 99,
-		position: 'absolute'
-	},
-	hudLabel: {
-		color: 'white',
-		fontFamily: 'Silkscreen',
-		fontWeight: '900',
-		fontSize: 30,
-		marginLeft: 2,
-		alignSelf: 'flex-start',
-		position: 'absolute',
-	}
 })

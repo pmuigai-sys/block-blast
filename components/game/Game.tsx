@@ -63,6 +63,7 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 	const combo = useSharedValue(0);
 	const lastBrokenLine = useSharedValue(0);
 	const gameOver = useSharedValue(false);
+    const totalBlocksPlaced = useSharedValue(0);
 	
 	const currentLevel = useSharedValue(1);
 	const gemsCollected = useSharedValue(0);
@@ -155,6 +156,8 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 
 			const pieceBlockCount = getBlockCount(piece);
 			score.value += pieceBlockCount;
+            totalBlocksPlaced.value += 1;
+
 			if (linesBroken > 0) {
                 runOnJS(playSound)('clear');
                 runOnJS(showEncouragement)(linesBroken);
@@ -240,7 +243,7 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
                     )}
 
                     <Onboarding mode={gameMode} visible={showOnboarding} onDismiss={() => setShowOnboarding(false)} />
-                    <GameOverOverlay gameOver={gameOver} onRestart={() => setAppState(MenuStateType.MENU)} />
+                    <GameOverOverlay gameOver={gameOver} onRestart={() => setAppState(MenuStateType.MENU)} gameMode={gameMode} blocksPlaced={totalBlocksPlaced} score={score} />
 				</View>
 			</GestureHandlerRootView>
 		</SafeAreaView>
@@ -253,7 +256,7 @@ function Onboarding({ mode, visible, onDismiss }: { mode: GameModeType, visible:
             case GameModeType.Infinite:
                 return {
                     title: "Infinite Rules",
-                    text: "Every hand is guaranteed playable by our AI. Your only challenge is to try and fail. Can you even reach a game over?"
+                    text: "Every hand is guaranteed playable by our engine. Your only challenge is to try and fail. Can you even reach a game over?"
                 };
             case GameModeType.Classic:
                 return {
@@ -285,19 +288,59 @@ function Onboarding({ mode, visible, onDismiss }: { mode: GameModeType, visible:
     );
 }
 
-function GameOverOverlay({ gameOver, onRestart }: { gameOver: SharedValue<boolean>, onRestart: () => void }) {
+function GameOverOverlay({ gameOver, onRestart, gameMode, blocksPlaced, score }: { gameOver: SharedValue<boolean>, onRestart: () => void, gameMode: GameModeType, blocksPlaced: SharedValue<number>, score: SharedValue<number> }) {
     const [visible, setVisible] = useState(false);
+    const [blocks, setBlocks] = useState(0);
+    const [finalScore, setFinalScore] = useState(0);
     
-    useAnimatedReaction(() => gameOver.value, (cur) => {
-        if (cur) runOnJS(setVisible)(true);
+    useAnimatedReaction(() => [gameOver.value, blocksPlaced.value, score.value], ([isOver, b, s]) => {
+        if (isOver) {
+            runOnJS(setBlocks)(b as number);
+            runOnJS(setFinalScore)(s as number);
+            runOnJS(setVisible)(true);
+        }
     });
 
     if (!visible) return null;
 
+    const calculateIQ = () => {
+        const isInfinite = gameMode === GameModeType.Infinite;
+        
+        if (isInfinite) {
+            if (finalScore < 100) return "Celestial Entity";
+            if (finalScore < 500) return "Aether Entity";
+            if (finalScore < 1000) return "Human (Strategist)";
+            if (finalScore < 3000) return "Primate";
+            return "Bird";
+        } else {
+            if (finalScore < 100) return "Bird";
+            if (finalScore < 500) return "Primate";
+            if (finalScore < 2000) return "Human";
+            if (finalScore < 5000) return "Aether Entity";
+            return "Celestial Entity";
+        }
+    };
+
+    const isInfinite = gameMode === GameModeType.Infinite;
+
     return (
         <View style={styles.overlay}>
-            <Text style={styles.gameOverText}>GAME OVER</Text>
-            <Text style={styles.restartButton} onPress={onRestart}>MAIN MENU</Text>
+            <Text style={styles.gameOverText}>
+                {isInfinite ? "CONGRATULATIONS!" : "GAME OVER"}
+            </Text>
+            {isInfinite && (
+                <Text style={styles.loopBeatenText}>YOU BEAT THE INFINITE LOOP</Text>
+            )}
+            
+            <View style={styles.statsContainer}>
+                <Text style={styles.statText}>Blocks Placed: {blocks}</Text>
+                <Text style={styles.statText}>Score: {finalScore}</Text>
+                <Text style={styles.statText}>IQ Rating: <Text style={{color: 'cyan'}}>{calculateIQ()}</Text></Text>
+            </View>
+
+            <Pressable style={styles.restartButtonPressable} onPress={onRestart}>
+                <Text style={styles.restartButtonText}>MAIN MENU</Text>
+            </Pressable>
         </View>
     );
 }
@@ -316,13 +359,25 @@ const styles = StyleSheet.create({
     },
     overlay: {
         ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', zIndex: 3000
+        backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', zIndex: 3000
     },
     gameOverText: {
-        fontFamily: 'Silkscreen', fontSize: 60, color: 'red', marginBottom: 20
+        fontFamily: 'Silkscreen', fontSize: 48, color: 'red', marginBottom: 10, textAlign: 'center'
     },
-    restartButton: {
-        fontFamily: 'Silkscreen', fontSize: 30, color: 'white', backgroundColor: 'blue', padding: 15, borderRadius: 10
+    loopBeatenText: {
+        fontFamily: 'Silkscreen', fontSize: 18, color: '#00ff00', marginBottom: 30, textAlign: 'center', paddingHorizontal: 20
+    },
+    statsContainer: {
+        marginBottom: 40, alignItems: 'center'
+    },
+    statText: {
+        fontFamily: 'Silkscreen', fontSize: 20, color: 'white', marginBottom: 10
+    },
+    restartButtonPressable: {
+        backgroundColor: 'blue', padding: 15, borderRadius: 10, borderWidth: 2, borderColor: 'white'
+    },
+    restartButtonText: {
+        fontFamily: 'Silkscreen', fontSize: 24, color: 'white'
     },
     modalBg: {
         flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center'
