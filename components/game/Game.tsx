@@ -15,6 +15,7 @@ import HandPieces from '@/components/game/HandPieces';
 import { GameModeType, useSetAppState, MenuStateType } from '@/hooks/useAppState';
 import { createHighScore, HighScoreId, updateHighScore } from '@/constants/Storage';
 import { getRandomTemplate, applyTemplate } from '@/constants/Templates';
+import { playVoiceReward } from '@/components/AudioController';
 
 const pieceOverlapsRectangle = (layout: Rectangle, other: Rectangle) => {
 	"worklet";
@@ -160,6 +161,7 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 
 			if (linesBroken > 0) {
                 runOnJS(playSound)('clear');
+                runOnJS(playVoiceReward)(linesBroken);
                 runOnJS(showEncouragement)(linesBroken);
 				lastBrokenLine.value = 0;
 				combo.value += linesBroken;

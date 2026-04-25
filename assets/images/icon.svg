@@ -1,6 +1,26 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="1024" height="1024" rx="200" fill="black"/>
-  <path d="M512 150L200 850H350L512 550L674 850H824L512 150Z" fill="#64C8FF"/>
-  <path d="M400 700H624L512 600L400 700Z" fill="white" fill-opacity="0.3"/>
-  <circle cx="512" cy="400" r="40" fill="white" />
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="neon" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="15" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1024" height="1024" fill="#000000" rx="160" />
+  
+  <!-- 8-Bit Styled 'A' with Neon Glow -->
+  <g filter="url(#neon)">
+    <!-- Cyan Outline -->
+    <path d="M412 256h200v64h64v512h-64v-128H412v128h-64V320h64v-64zm136 64h-72v256h136V320h-64z" fill="#00FFFF" opacity="0.3" />
+    
+    <!-- Main Neon Core -->
+    <path d="M412 256h200v64h64v512h-64v-128H412v128h-64V320h64v-64zm136 64h-72v256h136V320h-64z" fill="#FFFFFF" />
+    <path d="M412 256h200v64h64v512h-64v-128H412v128h-64V320h64v-64zm136 64h-72v256h136V320h-64z" fill="none" stroke="#00FFFF" stroke-width="12" stroke-linejoin="miter" />
+    
+    <!-- Inner Block Details -->
+    <rect x="444" y="320" width="136" height="256" fill="#000000" />
+    <rect x="444" y="320" width="136" height="64" fill="#00FFFF" opacity="0.8" />
+  </g>
 </svg>

@@ -17,6 +17,7 @@ import MainMenu from "@/components/MainMenu";
 import HighScores from "@/components/HighScoresMenu";
 import AboutMenu from "@/components/AboutMenu";
 import { PieceParticle } from "@/components/PieceParticle";
+import AudioController from "@/components/AudioController";
 
 configureReanimatedLogger({
 	level: ReanimatedLogLevel.warn,
@@ -40,6 +41,7 @@ export default function App() {
 	
 	return (
 		<Animated.View entering={FadeIn} exiting={FadeOut} style={styles.container}>
+			<AudioController />
 			{[...Array(25)].map((_, i) => (
 				<PieceParticle key={`particle${i}`} />
 			))}
