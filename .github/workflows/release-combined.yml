@@ -15,14 +15,49 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-web:
+  increment-version:
     runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.get_new_version.outputs.version }}
     steps:
       - name: 🏗 Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ⚙️ Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: 🆙 Increment Version
+        id: get_new_version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Increment npm version (patch)
+          npm version patch --no-git-tag-version
+          NEW_VER=$(node -p "require('./package.json').version")
+          
+          # Sync to app.json
+          node -e "let app = require('./app.json'); app.expo.version = '$NEW_VER'; require('fs').writeFileSync('./app.json', JSON.stringify(app, null, 2))"
+          
+          git add package.json app.json
+          git commit -m "chore: bump version to $NEW_VER [skip ci]" || echo "No changes to commit"
+          git push origin main
+          
+          echo "version=$NEW_VER" >> $GITHUB_OUTPUT
+
+  build-web:
+    needs: increment-version
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🏗 Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: ⚙️ Setup Node
         uses: actions/setup-node@v4
@@ -39,12 +74,6 @@ jobs:
       - name: 📦 Install dependencies
         run: npm install
 
-      - name: 🏷️ Get version from app.json
-        id: get_version
-        run: |
-          VERSION=$(node -p "require('./app.json').expo.version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: 🚀 Build Web
         run: npx expo export -p web
 
@@ -53,18 +82,16 @@ jobs:
         with:
           path: dist
 
-      - name: 🏷️ Auto-Update Release Tag
+      - name: 🏷️ Update Release Tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          TAG_NAME="v${{ steps.get_version.outputs.version }}"
-          git tag -d $TAG_NAME || true
-          git push origin :refs/tags/$TAG_NAME || true
+          TAG_NAME="v${{ needs.increment-version.outputs.new_version }}"
           git tag $TAG_NAME
           git push origin $TAG_NAME
 
   deploy-web:
-    needs: build-web
+    needs: [increment-version, build-web]
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -75,7 +102,7 @@ jobs:
         uses: actions/deploy-pages@v4
 
   build-android:
-    needs: build-web
+    needs: [increment-version, build-web]
     runs-on: ubuntu-latest
     steps:
       - name: 🏗 Checkout
@@ -98,12 +125,6 @@ jobs:
       - name: 📦 Install dependencies
         run: npm install
 
-      - name: 🏷️ Get version from app.json
-        id: get_version
-        run: |
-          VERSION=$(node -p "require('./app.json').expo.version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
       - name: 🛠 Prebuild Android
         run: npx expo prebuild --platform android --no-install
 
@@ -119,7 +140,7 @@ jobs:
       - name: 📝 Generate Release Notes
         run: |
           cat <<EOF > release_notes.md
-          ## 🌌 Aether v${{ steps.get_version.outputs.version }}
+          ## 🌌 Aether v${{ needs.increment-version.outputs.new_version }}
 
           ### 📦 Download & Install Guide
           1. **Download:** Click on \`aether-universal.apk\` below.
@@ -131,7 +152,7 @@ jobs:
       - name: 🏷️ Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.get_version.outputs.version }}
+          tag_name: v${{ needs.increment-version.outputs.new_version }}
           body_path: release_notes.md
           files: build/aether-universal.apk
         env:
