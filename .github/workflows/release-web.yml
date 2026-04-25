@@ -53,13 +53,17 @@ jobs:
         with:
           path: dist
 
-      - name: 🏷️ Create Release Tag
-        if: github.event_name == 'push'
+      - name: 🏷️ Auto-Update Release Tag
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag v${{ steps.get_version.outputs.version }} || echo "Tag already exists"
-          git push origin v${{ steps.get_version.outputs.version }} --force || echo "Tag push failed"
+          TAG_NAME="v${{ steps.get_version.outputs.version }}"
+          # Delete existing tag locally and remotely to force update
+          git tag -d $TAG_NAME || true
+          git push origin :refs/tags/$TAG_NAME || true
+          # Create and push fresh tag
+          git tag $TAG_NAME
+          git push origin $TAG_NAME
 
   deploy:
     needs: build

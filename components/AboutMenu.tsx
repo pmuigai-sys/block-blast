@@ -15,16 +15,16 @@ export default function AboutMenu() {
             <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
                 <Text style={styles.header}>Welcome to Aether</Text>
                 <Text style={styles.description}>
-                    A strategic block-placing experience redesigned for precision and challenge.
+                    A strategic block-placing experience redesigned for precision, visual excellence, and infinite challenge.
                 </Text>
 
                 <View style={styles.modeSection}>
                     <Text style={[styles.modeTitle, { color: cssColors.green }]}>Infinite Mode</Text>
                     <Text style={styles.modeText}>
-                        The ultimate strategic test. Our Super-AI ensures that every hand is "indestructible"—meaning there is always a valid path to survival.
+                        The ultimate strategic test. Our advanced backtracking engine ensures that every hand is "indestructible"—meaning there is always a valid path to survival.
                     </Text>
                     <Text style={styles.challenge}>
-                        The Challenge: Try as hard as you can to fail. The AI works against your mistakes to keep you alive. Only the most reckless strategy can lead to a game over.
+                        The Challenge: Try as hard as you can to fail. The engine works against your mistakes to keep you alive. Only the most reckless strategy can lead to a game over.
                     </Text>
                 </View>
 
@@ -42,6 +42,10 @@ export default function AboutMenu() {
                     </Text>
                 </View>
 
+                <Text style={styles.credits}>
+                    built by peter thairu muigai aka thairux with love ❤️
+                </Text>
+                
                 <Text style={styles.footer}>Master the grid. Control the Aether.</Text>
             </ScrollView>
         </SimplePopupView>
@@ -56,6 +60,7 @@ const styles = StyleSheet.create({
     content: {
         paddingHorizontal: 20,
         paddingBottom: 40,
+        alignItems: 'center'
     },
     header: {
         fontFamily: 'Silkscreen',
@@ -77,6 +82,7 @@ const styles = StyleSheet.create({
         borderLeftWidth: 3,
         borderLeftColor: 'rgba(255,255,255,0.1)',
         paddingLeft: 15,
+        width: '100%'
     },
     modeTitle: {
         fontFamily: 'Silkscreen',
@@ -96,11 +102,20 @@ const styles = StyleSheet.create({
         marginTop: 8,
         fontStyle: 'italic',
     },
+    credits: {
+        fontFamily: 'Silkscreen',
+        fontSize: 10,
+        color: 'rgba(255, 255, 255, 0.4)',
+        textAlign: 'center',
+        marginTop: 10,
+        marginBottom: 5,
+        lineHeight: 16
+    },
     footer: {
         fontFamily: 'Silkscreen',
         fontSize: 12,
         color: '#555',
         textAlign: 'center',
-        marginTop: 20,
+        marginTop: 5,
     }
 });

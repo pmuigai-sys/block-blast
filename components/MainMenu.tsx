@@ -53,9 +53,14 @@ export default function MainMenu() {
 	return <View style={styles.container}>
 
 		<AetherLogo style={{position: 'absolute', bottom: 20, left: 20}} blockSize={6}></AetherLogo>
-		<Animated.Text entering={BounceInUp.duration(800)} style={[styles.logo]}>
-			aether
-		</Animated.Text>
+		<View style={{ alignItems: 'center', marginBottom: 40 }}>
+            <Animated.Text entering={BounceInUp.duration(800)} style={[styles.logo]}>
+                aether
+            </Animated.Text>
+            <Animated.Text entering={FadeIn.delay(600)} style={styles.subtitle}>
+                by thairux
+            </Animated.Text>
+        </View>
 
 		<MainButton
 			onClick={() => {
@@ -235,12 +240,18 @@ const styles = StyleSheet.create({
 		fontFamily: "Silkscreen",
 		fontSize: 50,
 		color: "#FFF",
-		marginBottom: 40,
 		textAlign: "center",
 		textShadowColor: 'rgba(100, 200, 255, 0.8)',
 		textShadowOffset: { width: 0, height: 0 },
 		textShadowRadius: 20
 	},
+    subtitle: {
+        fontFamily: "Silkscreen",
+        fontSize: 16,
+        color: "rgba(255, 255, 255, 0.6)",
+        textAlign: "center",
+        marginTop: -5
+    },
 	button: {
 		width: "100%",
 		height: "100%",
