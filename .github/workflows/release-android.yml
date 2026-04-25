@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: 🏗 Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: ⚙️ Setup Node
         uses: actions/setup-node@v4
@@ -31,6 +33,12 @@ jobs:
       - name: 📦 Install dependencies
         run: npm install
 
+      - name: 🏷️ Get version from app.json
+        id: get_version
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: 🛠 Prebuild Android
         run: npx expo prebuild --platform android --no-install
 
@@ -43,29 +51,29 @@ jobs:
           mkdir -p build
           cp android/app/build/outputs/apk/release/app-release.apk build/aether-universal.apk
 
-      - name: 📝 Generate Release Notes & Tutorial
+      - name: 📝 Generate Release Notes
         run: |
           cat <<EOF > release_notes.md
-          ## 🌌 Aether v$(node -p "require('./app.json').expo.version")
+          ## 🌌 Aether v${{ steps.get_version.outputs.version }}
 
           ### 📦 Download & Install Guide
-          To install Aether on your Android device:
-          1. **Download:** Click on the \`aether-universal.apk\` asset below.
-          2. **Open:** Once downloaded, tap the file in your notification bar or downloads folder.
-          3. **Permissions:** If prompted, allow "Install from Unknown Sources" in your browser/file manager settings.
-          4. **Install:** Follow the system prompts to complete the installation.
-          5. **Play:** Find the celestial 'A' icon in your app drawer and enjoy!
-
-          ### ✨ What's New
-          - Optimized performance and mobile web layout.
-          - Indestructible Survival Engine for Infinite mode.
-          - Strategic IQ rating logic (beat the loop).
-          - Professional celestial branding.
+          1. **Download:** Click on \`aether-universal.apk\` below.
+          2. **Open:** Tap the file once downloaded.
+          3. **Permissions:** Allow "Install from Unknown Sources" if prompted.
+          4. **Enjoy:** Find the celestial 'A' icon in your app drawer.
           EOF
+
+      - name: 🏷️ Ensure Release Tag Exists
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag v${{ steps.get_version.outputs.version }} || echo "Tag exists"
+          git push origin v${{ steps.get_version.outputs.version }} || echo "Tag pushed"
 
       - name: 🏷️ Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: v${{ steps.get_version.outputs.version }}
           body_path: release_notes.md
           files: build/aether-universal.apk
         env:
