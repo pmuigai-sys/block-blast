@@ -1,6 +1,6 @@
 import { useAtom, useSetAtom } from "jotai";
 import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View, ViewStyle, ScrollView } from "react-native";
+import { Pressable, StyleSheet, Text, View, ViewStyle, ScrollView, Platform, Linking } from "react-native";
 import Animated, { BounceInUp, Easing, FadeIn, interpolateColor, useAnimatedStyle, useDerivedValue, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from "react-native-reanimated";
 import { MenuStateType, useSetAppState } from "@/hooks/useAppState";
 import { cssColors } from "@/constants/Color";
@@ -85,8 +85,19 @@ export default function MainMenu() {
 			textStyle={{ color: "white" }}
 			idleBounceRotate={true}
 		/>
+
+        {Platform.OS === 'web' && (
+            <MainButton 
+                onClick={() => Linking.openURL('https://github.com/Thairux/block-blast/releases/latest')}
+                backgroundColor={"#222"}
+                title={"Download APK"}
+                flavorText={"get aether for android"}
+                style={{borderColor: '#444', height: 50}}
+                textStyle={{color: '#999', fontSize: 18}}
+            />
+        )}
 		
-        <View style={{flexDirection: 'row', width: '80%', gap: 10, maxWidth: 420}}>
+        <View style={{flexDirection: 'row', width: '80%', gap: 10, maxWidth: 420, marginTop: 10}}>
             <MainButton onClick = {() => {
                 appendAppState(MenuStateType.HIGH_SCORES)
             }} backgroundColor={cssColors.pink} title={"Scores"} style={{flex: 1}} />

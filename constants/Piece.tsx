@@ -215,6 +215,13 @@ export const piecesData: PieceDataSaved[] = [
 		],
 		distributionPoints: 2,
 	},
+	// 1x1 (Survival Block)
+	{
+		matrix: [
+			[1],
+		],
+		distributionPoints: 0.5,
+	}
 ];
 
 export const pieceColors = [
@@ -325,7 +332,7 @@ export function getFittingPieceWorklet(board: any): PieceData {
 	}
 
 	// Fallback to the smallest piece if nothing fits
-	const smallPiece = piecesData[piecesData.length - 1]; // 1x2 or similar
+	const smallPiece = piecesData[piecesData.length - 1]; // 1x1 survival block
 
 	return {
 		...smallPiece,
