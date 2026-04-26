@@ -19,13 +19,13 @@ export default function AudioController() {
                 });
 
                 const { sound: mSound } = await Audio.Sound.createAsync(
-                    require('../assets/audio/music/menu_loop.wav'),
+                    require('../assets/audio/music/Heavy Pluck.wav'),
                     { isLooping: true, volume: 0.4 }
                 );
                 menuMusic.current = mSound;
 
                 const { sound: gSound } = await Audio.Sound.createAsync(
-                    require('../assets/audio/music/gameplay_loop.wav'),
+                    require('../assets/audio/music/Midnight Drift.wav'),
                     { isLooping: true, volume: 0.35 }
                 );
                 gameMusic.current = gSound;
