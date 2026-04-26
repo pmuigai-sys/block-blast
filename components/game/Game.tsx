@@ -74,16 +74,29 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
     const [encouragement, setEncouragement] = useState<string | null>(null);
     const [showOnboarding, setShowOnboarding] = useState(true);
 
+    const audioCache = React.useRef<{[key: string]: Audio.Sound | null}>({});
+
+    const preloadSounds = async () => {
+        try {
+            const sounds = {
+                place: require('../../assets/audio/sfx/place.wav'),
+                clear: require('../../assets/audio/sfx/clear.wav'),
+                gameover: require('../../assets/audio/sfx/game_over.wav')
+            };
+            for (const [key, file] of Object.entries(sounds)) {
+                const { sound } = await Audio.Sound.createAsync(file);
+                audioCache.current[key] = sound;
+            }
+        } catch (e) {
+            console.warn("Audio preload error", e);
+        }
+    };
+
     const playSound = async (type: 'place' | 'clear' | 'gameover') => {
         try {
-            let file;
-            if (type === 'place') file = require('../../assets/audio/sfx/place.wav');
-            else if (type === 'clear') file = require('../../assets/audio/sfx/clear.wav');
-            else if (type === 'gameover') file = require('../../assets/audio/sfx/game_over.wav');
-            
-            if (file) {
-                const { sound } = await Audio.Sound.createAsync(file);
-                await sound.playAsync();
+            const sound = audioCache.current[type];
+            if (sound) {
+                await sound.replayAsync();
             }
         } catch (e) {
             console.warn("Audio play error", e);
@@ -118,6 +131,12 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 		createHighScore({score: score.value, date: new Date().getTime(), type: gameMode}).then((id) => {
 			scoreStorageId.value = id;
 		});
+
+        preloadSounds();
+
+        return () => {
+            Object.values(audioCache.current).forEach(sound => sound?.unloadAsync());
+        };
 	}, []);
 
 	const handleDragEnd: DndProviderProps["onDragEnd"] = ({ active, over }) => {
@@ -215,16 +234,15 @@ export const Game = (({gameMode}: {gameMode: GameModeType}) => {
 	const handleUpdate: DndProviderProps["onUpdate"] = (event, {activeId, activeLayout, droppableActiveId}) => {
 		"worklet";
 		if (!droppableActiveId) {
-			board.value = deepCopyBoard(clearHoverBlocks(board.value));
+			clearHoverBlocks(board.value);
 			return;
 		}
 		if (draggingPiece.value == null) return;
 		const dropIdStr = droppableActiveId.toString();
 		const {x: dropX, y: dropY} = decodeDndId(dropIdStr);
 		const piece: PieceData = hand.value[draggingPiece.value!]!;
-		const newBoard = deepCopyBoard(clearHoverBlocks(board.value));
-		updateHoveredBreaks(newBoard, piece, dropX, dropY);
-		board.value = newBoard
+		clearHoverBlocks(board.value);
+		updateHoveredBreaks(board.value, piece, dropX, dropY);
 	}
 	
 	return (        
